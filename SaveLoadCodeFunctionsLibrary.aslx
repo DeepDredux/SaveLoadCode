@@ -6,9 +6,10 @@
 
   
   <!--
-  SaveLoadCode v5.1
+  SaveLoadCode v5.1.D
   Quest version: 5.8
   Written by: Leviathon, 2023
+  Editted by: DeepDredux (edits marked by 'DREDIT')
   
   Tutorial and notes here:
   https://github.com/Leviathon44/SaveLoadCode/wiki
@@ -65,6 +66,14 @@
     SaveString = SaveString+"game"+D2+"pov"+D2+"object"+D2+game.pov+D1
     // Record all changable object attributes
     foreach (o, AllObjects()) {
+	  // DREDIT: Don't continue if object has DontSaveFlag
+	  SaveObjectProceed = True
+	  if (HasAttribute (o, "DontSaveFlag")) {
+	    if (Equal(o.DontSaveFlag,True)) {
+		  SaveObjectProceed = False
+		}
+	  }
+	  if (SaveObjectProceed) {
       objectname = o.name
 	  // If object has ExcludeSaveAtts attribute, check that it is properly of a stringlist type. Do it here, so this check and warning is only made once per object.
 	  if (HasAttribute (o, "ExcludeSaveAtts")) {
@@ -168,8 +177,17 @@
           SaveString = SaveString+objectname+D2+attributename+D2+att_datatype+D2+att_value+D1
         }
       }
+	  }
     }
     foreach (o, AllExits()) {
+	  // DREDIT: Don't continue if object has DontSaveFlag
+	  SaveObjectProceed = True
+	  if (HasAttribute (o, "DontSaveFlag")) {
+	    if (Equal(o.DontSaveFlag,True)) {
+		  SaveObjectProceed = False
+		}
+	  }
+	  if (SaveObjectProceed) {
       objectname = o.name
 	  // If exit has ExcludeSaveAtts attribute, check that it is properly of a stringlist type. Do it here, so this check and warning is only made once per exit.
 	  if (HasAttribute (o, "ExcludeSaveAtts")) {
@@ -239,6 +257,7 @@
           SaveString = SaveString+objectname+D2+attributename+D2+att_datatype+D2+att_value+D1
         }
       }
+	  }
     }
     foreach (turnscript, AllTurnScripts()) {
       // Check for which turnscripts are enabled/disabled
@@ -282,15 +301,21 @@
 	  if (not ListContains(game.SaveAtts, "lastobjects")) {
 	    list add (game.SaveAtts, "lastobjects")
 	  }
-	  if (not ListContains(game.SaveAtts, "menuoptionskeys")) {
-        list add (game.SaveAtts, "menuoptionskeys")
-	  }
+	  // DREDIT: Commented out below.  You don't want to save this by default. Can run into some strange behavior with menus post-loading otherwise
+	  // if (not ListContains(game.SaveAtts, "menuoptionskeys")) {
+      //   list add (game.SaveAtts, "menuoptionskeys")
+	  // }
 	  if (not ListContains(game.SaveAtts, "menuoutputsection")) {
 	    list add (game.SaveAtts, "menuoutputsection")
 	  }
 	  if (not ListContains(game.SaveAtts, "SaveLoadCode_firsttimetrigger")) {
 	    list add (game.SaveAtts, "SaveLoadCode_firsttimetrigger")
 	  }
+	  // DREDIT: I ran into issues trying to load a save before hitting any first times or otherwise. Figured out it was because game.SaveLoadCode_firsttimetrigger didn't exist at time of save, so it didn't get overwritten when loading. So editing to create it if it doesn't already exist.
+	  if (not HasAttribute(game, "SaveLoadCode_firsttimetrigger")) {
+        // Make it a string dictionary so SaveLoadCode can more easily parse it
+        game.SaveLoadCode_firsttimetrigger = NewStringList()
+      }
 	  // list add (game.SaveAtts, "menucallback") // To Do -  This is the key to having a menu work when loading onto an active menu. It's a script attribute (set by the ShowMenu function, actually). So if I can figure out how to update a script attribute in-game, I can update this...
 	  if (not ListContains(game.SaveAtts, "menuallowcancel")) {
 	    list add (game.SaveAtts, "menuallowcancel")
@@ -312,11 +337,17 @@
 			  // Use different delimiter
 			  D3ex=D3+"$$&$$&$$"+D3
 			  firsttimeString = ""
-			  foreach (d, AttValue) {
-			    firsttimeString = firsttimeString + d + D3ex
+			  // DREDIT: Added extra logic to not throw errors if game.SaveLoadCode_firsttimetrigger is empty
+			  if (ListCount(AttValue)>0) {
+			    foreach (d, AttValue) {
+			      firsttimeString = firsttimeString + d + D3ex
+			    }
+			    // Remove final D3ex from end and save
+		        att_value = Left(firsttimeString, LengthOf(firsttimeString)-LengthOf(D3ex))
 			  }
-			  // Remove final D3ex from end and save
-		      att_value = Left(firsttimeString, LengthOf(firsttimeString)-LengthOf(D3ex))
+		      else {
+				att_value = firsttimeString
+		      }
 			}
             else if (att_datatype="stringlist" or att_datatype="objectlist") {
               X = ToString(AttValue)
@@ -450,7 +481,15 @@
     // Save the player.grid_coordinates so the player's map is saved. Because it is a dictionary of dictionaries, it must be saved in a special way...
     // grid_coordinates will be saved in form: "StuffBefore∂∑ObjectOwner∏MapAttributeName&%&Key1∏Lkey1 = Lvalue1:type;Lkey2 = Lvalue2:type;∂Key2∏Lkey1 = Lvalue1:type;Lkey2 = Lvalue2:type;Lkey3 = Lvalue3:type∂"
     MapDataFound=False
-	foreach (o, AllObjects()) {
+    foreach (o, AllObjects()) {
+	  // DREDIT: Don't continue if object has DontSaveFlag
+	  SaveObjectProceed = True
+	  if (HasAttribute (o, "DontSaveFlag")) {
+	    if (Equal(o.DontSaveFlag,True)) {
+		  SaveObjectProceed = False
+		}
+	  }
+	  if (SaveObjectProceed) {
       foreach (attributename, GetAttributeNames(o,false)) {
         objectname = o.name
         fullname = objectname+"."+attributename
@@ -459,7 +498,7 @@
           // ASSUMES THAT ANY SAVED MAP DATA (for teleporting and keeping your map) STARTS WITH 'saved_map_for'. This follows the naming convention recommended by https://docs.textadventures.co.uk/quest/showing_a_map.html
           SaveString = SaveString + D4 + objectname + D2 + attributename + "&%&"
           MapDataFound=True
-		  foreach (UKey, GetAttribute(o, attributename)) {
+          foreach (UKey, GetAttribute(o, attributename)) {
             SaveString = SaveString+UKey+D2
             UVal = DictionaryItem(GetAttribute(o, attributename), UKey)
             foreach (Lkey, UVal) {
@@ -474,7 +513,7 @@
           // Save the current map. Typically this is game.pov.grid_coordinates, but if player character can change, there may be multiple occurences of 'grid_coordinates'. Save them all.
           SaveString = SaveString + D4 + objectname + D2 + attributename + "&%&"
           MapDataFound=True
-		  foreach (UKey, GetAttribute(o, attributename)) {
+          foreach (UKey, GetAttribute(o, attributename)) {
             SaveString = SaveString+UKey+D2
             UVal = DictionaryItem(GetAttribute(o, attributename), UKey)
             foreach (Lkey, UVal) {
@@ -486,6 +525,7 @@
           }
         }
       }
+	  }
     }
 	if (MapDataFound=False) {
 	  // If no MapDataFound, add a D4 delimiter to the end of the SaveString so an error isn't thrown later
@@ -625,7 +665,10 @@
     CheckpointSplit = Split(SaveCode, D4toD1)
     SaveCode = ListItem(CheckpointSplit,0)
     CheckpointKeys = ListItem(CheckpointSplit,1)
-	CheckpointVals = ListItem(CheckpointSplit,2)
+	// DREDIT: Bug fix for case where you are loading and there is no checkpoint data. Otherwise will throw an error trying to reference index2 because it does not exist
+	if (not CheckpointKeys="") {
+	  CheckpointVals = ListItem(CheckpointSplit,2)
+	}
 	// Extract the game.textprocessor_seen parameter. The START of game.textprocessor_seen should be after the LAST D4 delimiter...
     D2exD1 = D2+"$&&$"+D1
 	TextProcSeenInfo = Right(SaveCode, LengthOf(SaveCode)-InstrRev(SaveCode, D4))
@@ -698,35 +741,131 @@
 	  error ("Load Aborted: SaveCode not identified by this game. GameID mismatch.")
     }
     else {
+	  // DREDIT: The original version of this comparison will erroneously assert that v1.2 > v1.12 because of the double conversion. I've edited it to remove the double conversion and compare the first two digits individually. Now references a new 'VersionCompareInt' variable to determine how the versions compare. See more below... 
       // Compare version of game in SaveCode to version of game loading it
-	  // First convert the game.version to a double
+
 	  if (ListCount(Split(ToString(game.version),"."))>2) {
 	    // If there is a second decimal with additional numbering/characters, ignore everything after that second decimal 
-        ThisGame_GameVersion = ToDouble(Left(ToString(game.version),Instr(Instr(ToString(game.version),".")+1, ToString(game.version),".")-1))
+        // ThisGame_GameVersion = ToDouble(Left(ToString(game.version),Instr(Instr(ToString(game.version),".")+1, ToString(game.version),".")-1))
+		ThisGame_GameVersion = Split(Left(ToString(game.version),Instr(Instr(ToString(game.version),".")+1, ToString(game.version),".")-1), ".")
       }
 	  else {
-        ThisGame_GameVersion = ToDouble(game.version)
-      }
+        //ThisGame_GameVersion = ToDouble(game.version)
+        ThisGame_GameVersion = Split(game.version, ".")
+		if (ListCount(ThisGame_GameVersion)=1) {
+		  list add (ThisGame_GameVersion, "0")
+		}
+	  }
 	  // Do the same for the loaded game version...
 	  if (ListCount(Split(VersionString,"."))>2) {
 	    // If there is a second decimal with additional numbering/characters, ignore everything after that second decimal 
-        Loaded_GameVersion = ToDouble(Left(VersionString,Instr(Instr(VersionString,".")+1,VersionString,".")-1))
-      }
+        // Loaded_GameVersion = ToDouble(Left(VersionString,Instr(Instr(VersionString,".")+1,VersionString,".")-1))
+        Loaded_GameVersion = Split(Left(VersionString,Instr(Instr(VersionString,".")+1,VersionString,".")-1), ".")
+	  }
 	  else {
-        Loaded_GameVersion = ToDouble(VersionString)
+        // Loaded_GameVersion = ToDouble(VersionString)
+		Loaded_GameVersion = Split(VersionString,".")
+		if (ListCount(Loaded_GameVersion)=1) {
+		  list add (Loaded_GameVersion, "0")
+		}
       }
-	  // Make sure the oldest allowed version is of type "double" as well
-	  if (not TypeOf(OldestAllowedVersion)="double") {
-        OldestAllowedVersion_Double = ToDouble(OldestAllowedVersion)
+	  // Make sure the oldest allowed version is of type "string" and split it as well
+	  if (not TypeOf(OldestAllowedVersion)="string") {
+	    // Assumes it is numeric
+		OldestAllowedVersion_String = ToString(OldestAllowedVersion)
+        // OldestAllowedVersion_Double = ToString(OldestAllowedVersion)
       }
       else {
-        OldestAllowedVersion_Double = OldestAllowedVersion
+        OldestAllowedVersion_String = OldestAllowedVersion
+		// OldestAllowedVersion_Double = OldestAllowedVersion
       }
+	  OldestAllowedVersion_List = Split(OldestAllowedVersion_String,".")
+	  if (ListCount(OldestAllowedVersion_List)=1) {
+		list add (OldestAllowedVersion_List, "0")
+	  }
+	  // VersionCompareInt = 1 if loading from older game version (previously Loaded_GameVersion<ThisGame_GameVersion)
+	  // VersionCompareInt = 0 if loading from same game version (previously Loaded_GameVersion=ThisGame_GameVersion)
+	  // VersionCompareInt = -1 if loading from newer game version (previously Loaded_GameVersion>ThisGame_GameVersion)
+	  // VersionCompareInt = -2 if comparison wasn't possible. Error case
+	  // Also new OldestAllowedBoolean that will be True if loaded game version >= OldestAllowedVersion. Defaults to FALSE
+	  VersionCompareInt = -2
+	  LoadedFirstDigit = ListItem(Loaded_GameVersion,0)
+	  LoadedFirstDigit = ToInt(LoadedFirstDigit)
+	  LoadedSecondDigit = ListItem(Loaded_GameVersion,1)
+	  LoadedSecondDigit = ToInt(LoadedSecondDigit)
+	  ThisGameFirstDigit = ListItem(ThisGame_GameVersion,0)
+	  ThisGameFirstDigit = ToInt(ThisGameFirstDigit)
+	  ThisGameSecondDigit = ListItem(ThisGame_GameVersion,1)
+	  ThisGameSecondDigit = ToInt(ThisGameSecondDigit)
+	  // Check for BannedLoadVersions
+	  if (HasAttribute(game,"SLCBannedLoadVersionList")) {
+	    if(ListContains(game.SLCBannedLoadVersionList,VersionString)) {
+		  // Trying to load a version in banned list, throw error
+		  error("The savecode you are attempting to load is from from an incompatible game version! Trying to load v"+VersionString+", and v"+VersionString+" is incompatible! ")
+		}
+		else {
+		  // Check first two digits
+		  LoadedVer2Digit = ToString(LoadedFirstDigit) + "." + ToString(LoadedSecondDigit)
+		  if (ListContains(game.SLCBannedLoadVersionList,LoadedVer2Digit)) {
+		    // Trying to load a version in banned list, throw error
+		    error("The savecode you are attempting to load is from from an incompatible game version! Trying to load v"+VersionString+", and v"+LoadedVer2Digit+".x is incompatible!")
+		  }
+		  else {
+		    LoadedVer2Digit = null
+		    // Check single digit
+			if (ListContains(game.SLCBannedLoadVersionList,ToString(LoadedFirstDigit))) {
+			  // Trying to load a version in banned list, throw error
+		      error("The savecode you are attempting to load is from from an incompatible game version! Trying to load v"+VersionString+", and v"+ToString(LoadedFirstDigit)+".x.x is incompatible!")
+			}
+		  }
+		}
+	  }
+	  if (LoadedFirstDigit=ThisGameFirstDigit) {
+	    // First digit of version the same, move to second
+		if (LoadedSecondDigit=ThisGameSecondDigit) {
+		  // Loading from same game version
+		  VersionCompareInt = 0
+		}
+		else if (LoadedSecondDigit<ThisGameSecondDigit) {
+		  // Loading from old game version
+		  VersionCompareInt = 1
+		}
+		else if (LoadedSecondDigit>ThisGameSecondDigit) {
+		  // Attempting to load from a newer version
+		  VersionCompareInt = -1
+		}
+	  }
+	  else if (LoadedFirstDigit<ThisGameFirstDigit) {
+	    // Loading from old game version
+		VersionCompareInt = 1
+	  }
+	  else if (LoadedFirstDigit>ThisGameFirstDigit) {
+	    // Attempting to load from a newer version
+		VersionCompareInt = -1
+	  }
+	  // Compare to OldestAllowedVersion_List to set OldestAllowedBoolean. Defaults to FALSE
+	  OldestAllowedBoolean = False
+	  OldestFirstDigit = ListItem(OldestAllowedVersion_List,0)
+	  OldestFirstDigit = ToInt(OldestFirstDigit)
+	  OldestSecondDigit = ListItem(OldestAllowedVersion_List,1)
+	  OldestSecondDigit = ToInt(OldestSecondDigit)
+	  if (LoadedFirstDigit=OldestFirstDigit) {
+	    // First digit of version the same, move to second
+		if (LoadedSecondDigit>=OldestSecondDigit) {
+		  // Loading from version greater than or equal to the oldest allowed
+		  OldestAllowedBoolean = True
+		}
+	  }
+	  else if (LoadedFirstDigit>OldestFirstDigit) {
+	    // Loading from version greater than the oldest allowed
+		OldestAllowedBoolean = True
+	  }
       // If upgrading from an old game version, then arbitrarily set Loaded_GameVersion to ThisGameVersion to proceed.
-      if (Loaded_GameVersion<ThisGame_GameVersion) {
+      if (VersionCompareInt=1) {
+
         if (upgradesave = False) {
-          if (OldestAllowedVersion_Double<=Loaded_GameVersion) {
-            msg ("WARNING! The SaveCode you are attempting to load is from an older game version.<br>Saved Game: v"+ToString(Loaded_GameVersion)+"<br>This Game: v"+ToString(ThisGame_GameVersion)+"<br><br>Would you like to attempt to upgrade this save to the current version? (Results may vary...)")
+          if (OldestAllowedBoolean=True) {
+            msg ("WARNING! The SaveCode you are attempting to load is from an older game version.<br>Saved Game: v"+ToString(VersionString)+"<br>This Game: v"+ToString(game.version)+"<br><br>Would you like to attempt to upgrade this save to the current version? (Results may vary...)")
             // Need to save SaveGameCodeDecoded as an attribute temporarily so it can be used by the ShowMenu function
             create ("SaveGameDecodedObj")
             set (SaveGameDecodedObj, "value", SaveGameCodeDecoded)
@@ -750,7 +889,7 @@
           else {
             // Change cursor back to normal when done
 	        JS.eval("$('div.ui-widget-overlay.ui-front').css('cursor', '');")
-			error ("ERROR: The SaveCode you are attempting to load is from an INCOMPATIBLE older game version, and thus cannot be loaded by this version of the game.<br>Saved Game: v"+ToString(Loaded_GameVersion)+"<br>This Game: v"+ToString(ThisGame_GameVersion)+"<br>Oldest Compatible Version: v"+ToString(OldestAllowedVersion)+"<br><br>Loading aborted...")
+			error ("ERROR: The SaveCode you are attempting to load is from an INCOMPATIBLE older game version, and thus cannot be loaded by this version of the game.<br>Saved Game: v"+ToString(VersionString)+"<br>This Game: v"+ToString(game.version)+"<br>Oldest Compatible Version: v"+ToString(OldestAllowedVersion)+"<br><br>Loading aborted...")
           }
         }
         else {
@@ -758,17 +897,18 @@
           Proceed = True
         }
       }
-      else if (Loaded_GameVersion>ThisGame_GameVersion) {
+      else if (VersionCompareInt=-1) {
         // Change cursor back to normal when done
 	    JS.eval("$('div.ui-widget-overlay.ui-front').css('cursor', '');")
-		error ("ERROR: The SaveCode you are attempting to load is from a newer version of this game and is not compatible.<br>Saved Game: v"+ToString(Loaded_GameVersion)+"<br>This Game: v"+ToString(ThisGame_GameVersion)+"<br>Please try a different SaveCode or use an updated game file.<br><br>Load aborted.")
+		error ("ERROR: The SaveCode you are attempting to load is from a newer version of this game and is not compatible.<br>Saved Game: v"+ToString(VersionString)+"<br>This Game: v"+ToString(game.version)+"<br>Please try a different SaveCode or use an updated game file.<br><br>Load aborted.")
       }
-      else {
+      else if (VersionCompareInt=0) {
         msg ("Proceeding with load...")
 		// Change cursor to spinner while loading
 	    JS.eval("$('div.ui-widget-overlay.ui-front').css('cursor', 'wait');")
         Proceed = True
       }
+	  // DREDIT end
       if (Proceed=True) {
 	    // If CheckpointKeys not an empty string, then that means there was game.checkpoints data saved. Extract it.
         if (not CheckpointKeys="") {
@@ -1221,6 +1361,8 @@
           msg ("Destroyed objects: "+DestroyedObjDebugList)
           msg ("Skipped Attributes:<br>"+SkippedAttList)
         }
+		// DREDIT: Store the loaded game version so it can be referenced later
+		game.LoadedCodeVersionString = VersionString
         // Finally, update game.pov.parent and game.pov
         wait {
           set (GamePOVObject, "parent", GamePOVParent)
@@ -1281,6 +1423,14 @@
     SaveString = SaveString+"game"+D2+"pov"+D2+"object"+D2+game.pov+D1
     // Record all changable object attributes
     foreach (o, AllObjects()) {
+	  // DREDIT: Don't continue if object has DontSaveFlag
+	  SaveObjectProceed = True
+	  if (HasAttribute (o, "DontSaveFlag")) {
+	    if (Equal(o.DontSaveFlag,True)) {
+		  SaveObjectProceed = False
+		}
+	  }
+	  if (SaveObjectProceed) {
       objectname = o.name
 	  // If object has ExcludeSaveAtts attribute, check that it is properly of a stringlist type. Do it here, so this check and warning is only made once per object.
 	  if (HasAttribute (o, "ExcludeSaveAtts")) {
@@ -1373,8 +1523,17 @@
           SaveString = SaveString+objectname+D2+attributename+D2+att_datatype+D2+att_value+D1
         }
       }
+	  }
     }
     foreach (o, AllExits()) {
+	  // DREDIT: Don't continue if object has DontSaveFlag
+	  SaveObjectProceed = True
+	  if (HasAttribute (o, "DontSaveFlag")) {
+	    if (Equal(o.DontSaveFlag,True)) {
+		  SaveObjectProceed = False
+		}
+	  }
+	  if (SaveObjectProceed) {
       objectname = o.name
 	  // If exit has ExcludeSaveAtts attribute, check that it is properly of a stringlist type. Do it here, so this check and warning is only made once per exit.
 	  if (HasAttribute (o, "ExcludeSaveAtts")) {
@@ -1439,6 +1598,7 @@
           SaveString = SaveString+objectname+D2+attributename+D2+att_datatype+D2+att_value+D1
         }
       }
+	  }
     }
     foreach (turnscript, AllTurnScripts()) {
       // Check for which turnscripts are enabled/disabled
@@ -1482,15 +1642,21 @@
 	  if (not ListContains(game.SaveAtts, "lastobjects")) {
 	    list add (game.SaveAtts, "lastobjects")
 	  }
-	  if (not ListContains(game.SaveAtts, "menuoptionskeys")) {
-        list add (game.SaveAtts, "menuoptionskeys")
-	  }
+	  // DREDIT: Commented out below. You don't want to save this by default. Can run into some strange behavior with menus post-loading otherwise
+	  // if (not ListContains(game.SaveAtts, "menuoptionskeys")) {
+      //   list add (game.SaveAtts, "menuoptionskeys")
+	  // }
 	  if (not ListContains(game.SaveAtts, "menuoutputsection")) {
 	    list add (game.SaveAtts, "menuoutputsection")
 	  }
 	  if (not ListContains(game.SaveAtts, "SaveLoadCode_firsttimetrigger")) {
 	    list add (game.SaveAtts, "SaveLoadCode_firsttimetrigger")
 	  }
+	  // DREDIT: I ran into issues trying to load a save before hitting any first times or otherwise. Figured out it was because game.SaveLoadCode_firsttimetrigger didn't exist at time of save, so it didn't get overwritten when loading. So editing to create it if it doesn't already exist.
+	  if (not HasAttribute(game, "SaveLoadCode_firsttimetrigger")) {
+        // Make it a string dictionary so SaveLoadCode can more easily parse it
+        game.SaveLoadCode_firsttimetrigger = NewStringList()
+      }
 	  // list add (game.SaveAtts, "menucallback") // To Do - This is the key to having a menu work when loading onto an active menu. It's a script attribute (set by the ShowMenu function, actually). So if I can figure out how to update a script attribute in-game, I can update this...
 	  if (not ListContains(game.SaveAtts, "menuallowcancel")) {
 	    list add (game.SaveAtts, "menuallowcancel")
@@ -1523,11 +1689,17 @@
 			    // Use different delimiter
 			    D3ex=D3+"$$&$$&$$"+D3
 			    firsttimeString = ""
-			    foreach (d, AttValue) {
-			      firsttimeString = firsttimeString + d + D3ex
+				// DREDIT: Added extra logic to not throw errors if game.SaveLoadCode_firsttimetrigger is empty
+				if (ListCount(AttValue)>0) {
+			      foreach (d, AttValue) {
+			        firsttimeString = firsttimeString + d + D3ex
+			      }
+			      // Remove final D3ex from end and save
+		          att_value = Left(firsttimeString, LengthOf(firsttimeString)-LengthOf(D3ex))
 			    }
-			    // Remove final D3ex from end and save
-		        att_value = Left(firsttimeString, LengthOf(firsttimeString)-LengthOf(D3ex))
+				else {
+				  att_value = firsttimeString
+				}
 			  }
               else if (att_datatype="stringlist" or att_datatype="objectlist") {
                 X = ToString(AttValue)
@@ -1640,7 +1812,15 @@
     // Save the player.grid_coordinates so the player's map is saved. Because it is a dictionary of dictionaries, it must be saved in a special way...
     // grid_coordinates will be saved in form: "StuffBefore∂∑ObjectOwner∏MapAttributeName&%&Key1∏Lkey1 = Lvalue1:type;Lkey2 = Lvalue2:type;∂Key2∏Lkey1 = Lvalue1:type;Lkey2 = Lvalue2:type;Lkey3 = Lvalue3:type∂"
     MapDataFound=False
-	foreach (o, AllObjects()) {
+    foreach (o, AllObjects()) {
+	  // DREDIT: Don't continue if object has DontSaveFlag
+	  SaveObjectProceed = True
+	  if (HasAttribute (o, "DontSaveFlag")) {
+	    if (Equal(o.DontSaveFlag,True)) {
+		  SaveObjectProceed = False
+		}
+	  }
+	  if (SaveObjectProceed) {
       foreach (attributename, GetAttributeNames(o,false)) {
         objectname = o.name
         fullname = objectname+"."+attributename
@@ -1649,7 +1829,7 @@
           // ASSUMES THAT ANY SAVED MAP DATA (for teleporting and keeping your map) STARTS WITH 'saved_map_for'. This follows the naming convention recommended by https://docs.textadventures.co.uk/quest/showing_a_map.html
           SaveString = SaveString + D4 + objectname + D2 + attributename + "&%&"
           MapDataFound=True
-		  foreach (UKey, GetAttribute(o, attributename)) {
+          foreach (UKey, GetAttribute(o, attributename)) {
             SaveString = SaveString+UKey+D2
             UVal = DictionaryItem(GetAttribute(o, attributename), UKey)
             foreach (Lkey, UVal) {
@@ -1664,7 +1844,7 @@
           // Save the current map. Typically this is game.pov.grid_coordinates, but if player character can change, there may be multiple occurences of 'grid_coordinates'. Save them all.
           SaveString = SaveString + D4 + objectname + D2 + attributename + "&%&"
           MapDataFound=True
-		  foreach (UKey, GetAttribute(o, attributename)) {
+          foreach (UKey, GetAttribute(o, attributename)) {
             SaveString = SaveString+UKey+D2
             UVal = DictionaryItem(GetAttribute(o, attributename), UKey)
             foreach (Lkey, UVal) {
@@ -1676,6 +1856,7 @@
           }
         }
       }
+	  }
     }
 	if (MapDataFound=False) {
 	  // If no MapDataFound, add a D4 delimiter to the end of the SaveString so an error isn't thrown later
@@ -1858,46 +2039,142 @@
       error ("Load Aborted: SaveCode not identified by this game. GameID mismatch.")
     }
     else {
+      // DREDIT: The original version of this comparison will erroneously assert that v1.2 > v1.12 because of the double conversion. I've edited it to remove the double conversion and compare the first two digits individually. Now references a new 'VersionCompareInt' variable to determine how the versions compare. See more below... 
       // Compare version of game in SaveCode to version of game loading it
-      // First convert the game.version to a double
+
 	  if (ListCount(Split(ToString(game.version),"."))>2) {
 	    // If there is a second decimal with additional numbering/characters, ignore everything after that second decimal 
-        ThisGame_GameVersion = ToDouble(Left(ToString(game.version),Instr(Instr(ToString(game.version),".")+1, ToString(game.version),".")-1))
+        // ThisGame_GameVersion = ToDouble(Left(ToString(game.version),Instr(Instr(ToString(game.version),".")+1, ToString(game.version),".")-1))
+		ThisGame_GameVersion = Split(Left(ToString(game.version),Instr(Instr(ToString(game.version),".")+1, ToString(game.version),".")-1), ".")
       }
 	  else {
-        ThisGame_GameVersion = ToDouble(game.version)
-      }
+        //ThisGame_GameVersion = ToDouble(game.version)
+        ThisGame_GameVersion = Split(game.version, ".")
+		if (ListCount(ThisGame_GameVersion)=1) {
+		  list add (ThisGame_GameVersion, "0")
+		}
+	  }
 	  // Do the same for the loaded game version...
 	  if (ListCount(Split(VersionString,"."))>2) {
 	    // If there is a second decimal with additional numbering/characters, ignore everything after that second decimal 
-        Loaded_GameVersion = ToDouble(Left(VersionString,Instr(Instr(VersionString,".")+1,VersionString,".")-1))
-      }
+        // Loaded_GameVersion = ToDouble(Left(VersionString,Instr(Instr(VersionString,".")+1,VersionString,".")-1))
+        Loaded_GameVersion = Split(Left(VersionString,Instr(Instr(VersionString,".")+1,VersionString,".")-1), ".")
+	  }
 	  else {
-        Loaded_GameVersion = ToDouble(VersionString)
+        // Loaded_GameVersion = ToDouble(VersionString)
+		Loaded_GameVersion = Split(VersionString,".")
+		if (ListCount(Loaded_GameVersion)=1) {
+		  list add (Loaded_GameVersion, "0")
+		}
       }
-	  // Make sure the oldest allowed version is of type "double" as well
-	  if (not TypeOf(OldestAllowedVersion)="double") {
-        OldestAllowedVersion_Double = ToDouble(OldestAllowedVersion)
+	  // Make sure the oldest allowed version is of type "string" and split it as well
+	  if (not TypeOf(OldestAllowedVersion)="string") {
+	    // Assumes it is numeric
+		OldestAllowedVersion_String = ToString(OldestAllowedVersion)
+        // OldestAllowedVersion_Double = ToString(OldestAllowedVersion)
       }
       else {
-        OldestAllowedVersion_Double = OldestAllowedVersion
+        OldestAllowedVersion_String = OldestAllowedVersion
+		// OldestAllowedVersion_Double = OldestAllowedVersion
       }
+	  OldestAllowedVersion_List = Split(OldestAllowedVersion_String,".")
+	  if (ListCount(OldestAllowedVersion_List)=1) {
+		list add (OldestAllowedVersion_List, "0")
+	  }
+	  // VersionCompareInt = 1 if loading from older game version (previously Loaded_GameVersion<ThisGame_GameVersion)
+	  // VersionCompareInt = 0 if loading from same game version (previously Loaded_GameVersion=ThisGame_GameVersion)
+	  // VersionCompareInt = -1 if loading from newer game version (previously Loaded_GameVersion>ThisGame_GameVersion)
+	  // VersionCompareInt = -2 if comparison wasn't possible. Error case
+	  // Also new OldestAllowedBoolean that will be True if loaded game version >= OldestAllowedVersion. Defaults to FALSE
+	  VersionCompareInt = -2
+	  LoadedFirstDigit = ListItem(Loaded_GameVersion,0)
+	  LoadedFirstDigit = ToInt(LoadedFirstDigit)
+	  LoadedSecondDigit = ListItem(Loaded_GameVersion,1)
+	  LoadedSecondDigit = ToInt(LoadedSecondDigit)
+	  ThisGameFirstDigit = ListItem(ThisGame_GameVersion,0)
+	  ThisGameFirstDigit = ToInt(ThisGameFirstDigit)
+	  ThisGameSecondDigit = ListItem(ThisGame_GameVersion,1)
+	  ThisGameSecondDigit = ToInt(ThisGameSecondDigit)
+	  // Check for BannedLoadVersions
+	  if (HasAttribute(game,"SLCBannedLoadVersionList")) {
+	    if(ListContains(game.SLCBannedLoadVersionList,VersionString)) {
+		  // Trying to load a version in banned list, throw error
+		  error("The savecode you are attempting to load is from from an incompatible game version: v"+VersionString+"!")
+		}
+		else {
+		  // Check first two digits
+		  LoadedVer2Digit = ToString(LoadedFirstDigit) + "." + ToString(LoadedSecondDigit)
+		  if (ListContains(game.SLCBannedLoadVersionList,LoadedVer2Digit)) {
+		    // Trying to load a version in banned list, throw error
+		    error("The savecode you are attempting to load is from from an incompatible game version: v"+LoadedVer2Digit+".x!")
+		  }
+		  else {
+		    LoadedVer2Digit = null
+		    // Check single digit
+			if (ListContains(game.SLCBannedLoadVersionList,ToString(LoadedFirstDigit))) {
+			  // Trying to load a version in banned list, throw error
+		      error("The savecode you are attempting to load is from from an incompatible game version: v"+ToString(LoadedFirstDigit)+".x.x!")
+			}
+		  }
+		}
+	  }
+	  if (LoadedFirstDigit=ThisGameFirstDigit) {
+	    // First digit of version the same, move to second
+		if (LoadedSecondDigit=ThisGameSecondDigit) {
+		  // Loading from same game version
+		  VersionCompareInt = 0
+		}
+		else if (LoadedSecondDigit<ThisGameSecondDigit) {
+		  // Loading from old game version
+		  VersionCompareInt = 1
+		}
+		else if (LoadedSecondDigit>ThisGameSecondDigit) {
+		  // Attempting to load from a newer version
+		  VersionCompareInt = -1
+		}
+	  }
+	  else if (LoadedFirstDigit<ThisGameFirstDigit) {
+	    // Loading from old game version
+		VersionCompareInt = 1
+	  }
+	  else if (LoadedFirstDigit>ThisGameFirstDigit) {
+	    // Attempting to load from a newer version
+		VersionCompareInt = -1
+	  }
+	  // Compare to OldestAllowedVersion_List to set OldestAllowedBoolean. Defaults to FALSE
+	  OldestAllowedBoolean = False
+	  OldestFirstDigit = ListItem(OldestAllowedVersion_List,0)
+	  OldestFirstDigit = ToInt(OldestFirstDigit)
+	  OldestSecondDigit = ListItem(OldestAllowedVersion_List,1)
+	  OldestSecondDigit = ToInt(OldestSecondDigit)
+	  if (LoadedFirstDigit=OldestFirstDigit) {
+	    // First digit of version the same, move to second
+		if (LoadedSecondDigit>=OldestSecondDigit) {
+		  // Loading from version greater than or equal to the oldest allowed
+		  OldestAllowedBoolean = True
+		}
+	  }
+	  else if (LoadedFirstDigit>OldestFirstDigit) {
+	    // Loading from version greater than the oldest allowed
+		OldestAllowedBoolean = True
+	  }
       // If upgrading from an old game version, then arbitrarily set Loaded_GameVersion to ThisGameVersion to proceed.
-      if (Loaded_GameVersion<ThisGame_GameVersion) {
-        if (OldestAllowedVersion_Double<=Loaded_GameVersion) {
+      if (VersionCompareInt=1) {
+        if (OldestAllowedBoolean) {
           upgradesave = True
           Proceed = True
         }
         else {
-          error ("ERROR: The SaveCheckpoint you are attempting to load is from an INCOMPATIBLE older game version, and thus cannot be loaded by this version of the game.<br>Saved Checkpoint: v"+ToString(Loaded_GameVersion)+"<br>This Game: v"+ToString(ThisGame_GameVersion)+"<br>Oldest Compatible Version: v"+ToString(OldestAllowedVersion)+"<br><br>Loading aborted...")
+          error ("ERROR: The SaveCheckpoint you are attempting to load is from an INCOMPATIBLE older game version, and thus cannot be loaded by this version of the game.<br>Saved Checkpoint: v"+ToString(VersionString)+"<br>This Game: v"+ToString(game.version)+"<br>Oldest Compatible Version: v"+ToString(OldestAllowedVersion)+"<br><br>Loading aborted...")
         }
       }
-      else if (Loaded_GameVersion>ThisGame_GameVersion) {
-        error ("ERROR: The SaveCheckpoint you are attempting to load is from a newer version of this game and is not compatible.<br>Saved Checkpoint: v"+ToString(Loaded_GameVersion)+"<br>This Game: v"+ToString(ThisGame_GameVersion)+"<br>Please try a different SaveCode or use an updated game file.<br><br>Load aborted.")
+      else if (VersionCompareInt=-1) {
+        error ("ERROR: The SaveCheckpoint you are attempting to load is from a newer version of this game and is not compatible.<br>Saved Checkpoint: v"+ToString(VersionString)+"<br>This Game: v"+ToString(game.version)+"<br>Please try a different SaveCode or use an updated game file.<br><br>Load aborted.")
       }
-      else {
+      else if (VersionCompareInt=0) {
         Proceed = True
       }
+	  // DREDIT end
       if (Proceed=True) {
 	    // Update game.textprocessor_seen
 		if (ListCount(TextProcKeyValPairs)>0 and not Equal(ListItem(TextProcKeyValPairs,0),"")) {
@@ -2332,6 +2609,8 @@
           msg ("Destroyed objects: "+DestroyedObjDebugList)
           msg ("Skipped Attributes:<br>"+SkippedAttList)
         }
+		// DREDIT: Store the loaded game version so I can reference it later
+		game.LoadedCheckVersionString = VersionString
         // Finally, update game.pov.parent and game.pov
         set (GamePOVObject, "parent", GamePOVParent)
         game.pov = GamePOVObject

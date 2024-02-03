@@ -3,12 +3,13 @@ function showPopupSave(text) {
     try {
 	//Original Popup Function Courtesy of KV. Altered slightly for our specific save code popup.
 	$('#msgboxCaption').html(text);
-
+    // DREDIT: Make box width vary based on window size for better compatibility
+	var boxWidth = Math.min(650, $(window).width())
     var msgboxOptions = {
         modal: true,
         autoOpen: false,
         title: "Save Game Code",
-        width: "650px",
+        width: boxWidth,
         height: "auto",
         buttons: [
 			{
@@ -152,12 +153,13 @@ function LoadSaveCode(LoadCode) {
 
 function LoadGamePrompt() {
 	$('#msgboxCaption').html("<form id='LoadCodeForm'><textarea id='LoadCodeBox' cols='55' rows='11' style='overflow:auto;max-width:100%'></textarea></form>");
-
+    // DREDIT: Make box width vary based on window size for better compatibility
+	var boxWidth = Math.min(650, $(window).width())
     var msgboxOptions = {
         modal: true,
         autoOpen: false,
         title: "Paste SaveCode to Load",
-		width: "650px",
+		width: boxWidth,
         buttons: [
 			{
 			    text: 'Load Saved Game',
